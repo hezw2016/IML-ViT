@@ -5,3 +5,13 @@ eval_dir_*
 pretrained-weights/*
 !pretrained-weights/mae_download_page.md
 *.pth
+*.zip
+iml_vit_checkpoint/*
+CASIA2.0_revised_corrected.zip
+CASIA1.0.zip
+datasets/*
+datasets
+localrun.sh
+experiments
+*.txt
+output_dir

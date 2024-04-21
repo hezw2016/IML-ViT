@@ -1,4 +1,5 @@
-from modules.window_attention_ViT import ViT as window_attention_vit, SimpleFeaturePyramid, LastLevelMaxPool
+from modules.window_attention_ViT import ViT as window_attention_vit
+from modules.window_attention_ViT import SimpleFeaturePyramid, LastLevelMaxPool
 from modules.decoderhead import PredictHead
 
 import torch.nn as nn
@@ -8,6 +9,8 @@ from functools import partial
 
 import sys
 sys.path.append('./modules')
+
+from utils.loss import DiceLoss, MulticlassDiceLoss
 
 class iml_vit_model(nn.Module):
     
@@ -96,6 +99,7 @@ class iml_vit_model(nn.Module):
         # Edge loss hyper-parameters    
         self.BCE_loss = nn.BCEWithLogitsLoss()
         self.edge_lambda = edge_lambda
+        self.DICE_loss = DiceLoss()
         
         self.apply(self._init_weights)
         self._mae_init_weights()
@@ -132,14 +136,20 @@ class iml_vit_model(nn.Module):
         
         # compute the loss
         predict_loss = self.BCE_loss(mask_pred, masks)
-        edge_loss = F.binary_cross_entropy_with_logits(
-            input = mask_pred,
-            target= masks, 
-            weight = edge_masks
-            ) * self.edge_lambda 
-        predict_loss += edge_loss
-        mask_pred = torch.sigmoid(mask_pred)
+        edge_loss = 0.
+        # edge_loss = F.binary_cross_entropy_with_logits(
+        #     input = mask_pred,
+        #     target= masks, 
+        #     weight = edge_masks
+        #     ) * self.edge_lambda 
+        # predict_loss += edge_loss
         
+        mask_pred = torch.sigmoid(mask_pred)
+
+        dice_loss = self.DICE_loss(mask_pred, masks) # 输入之前需要经过sigmoid
+        edge_loss = dice_loss
+        predict_loss += dice_loss
+
         return predict_loss, mask_pred, edge_loss
 
 

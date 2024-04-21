@@ -25,7 +25,7 @@ def train_one_epoch(model: torch.nn.Module,
     metric_logger = misc.MetricLogger(delimiter="  ")
     metric_logger.add_meter('lr', misc.SmoothedValue(window_size=1, fmt='{value:.6f}'))
     header = 'Epoch: [{}]'.format(epoch)
-    print_freq = 20
+    print_freq = 512  #
 
     accum_iter = args.accum_iter
 
@@ -47,7 +47,8 @@ def train_one_epoch(model: torch.nn.Module,
         with torch.cuda.amp.autocast():
             predict_loss, predict, edge_loss = model(samples, masks, edge_mask, shape)
             predict_loss_value = predict_loss.item()
-            edge_loss_value = edge_loss.item()
+            # edge_loss_value = edge_loss.item()
+            edge_loss_value = edge_loss
             
         predict_loss = predict_loss / accum_iter
         loss_scaler(predict_loss,optimizer, parameters=model.parameters(),
@@ -102,6 +103,7 @@ def test_one_epoch(model: torch.nn.Module,
         # F1 evaluation for an Epoch during training
         print_freq = 20
         header = 'Test: [{}]'.format(epoch)
+        # data_loader will return output_list
         for data_iter_step, (images, masks, edge_mask, shape) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
             
             images, masks, edge_mask = images.to(device), masks.to(device), edge_mask.to(device)
@@ -114,11 +116,14 @@ def test_one_epoch(model: torch.nn.Module,
         
             local_f1 = evaluation.cal_F1(TP, TN, FP, FN)
             # print(local_f1)
+            # local_f1_hzw = evaluation.cal_pixel_f1_hzw(pred=predict, target=masks, shape=shape, th=0.5)
+            # print(local_f1_hzw)
             
             for i in local_f1: # merge batch
                 metric_logger.update(average_f1=i)
                 print(metric_logger.meters['average_f1'].count)
                 print(metric_logger.meters['average_f1'].total)
+                # print(metric_logger.meters['average_f1'].avg)
 
         metric_logger.synchronize_between_processes()    
         # print("---syncronized---")

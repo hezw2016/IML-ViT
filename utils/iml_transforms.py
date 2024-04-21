@@ -176,6 +176,7 @@ def get_albu_transforms(type_ = 'train', outputsize = 1024):
     """
     
     assert type_ in ['train', 'test', 'pad'] , "type_ must be 'train' or 'test' of 'pad' "
+    
     trans = None
     if type_ == 'train':
         trans = albu.Compose([

@@ -21,7 +21,7 @@ print(f"Current Torch version: {major_version}.{minor_version}")
 if major_version >= 2:
     from torch import inf
 else:
-    from torch._six import inf
+    from torch.six import inf
 
 class SmoothedValue(object):
     """Track a series of values and provide access to smoothed values over a

@@ -36,10 +36,11 @@ def get_args_parser():
     parser = argparse.ArgumentParser('IML-ViT training', add_help=True)
     parser.add_argument('--batch_size', default=1, type=int,
                         help='Batch size per GPU (effective batch size is batch_size * accum_iter * # gpus')
-    parser.add_argument('--test_batch_size', default=2, type=int,
+    parser.add_argument('--test_batch_size', default=1, type=int,
                         help="batch size for testing")
     #
-    parser.add_argument('--vit_pretrain_path', default = '/root/workspace/IML-ViT/pretrained-weights/mae_pretrain_vit_base.pth', type=str, help='path to vit pretrain model by MAE')
+    parser.add_argument('--vit_pretrain_path', default = './pretrained-weights/mae_pretrain_vit_base.pth', type=str, 
+                        help='path to vit pretrain model by MAE')
     
     parser.add_argument('--epochs', default=200, type=int)
     parser.add_argument('--test_period', default=4, type=int,
@@ -66,9 +67,9 @@ def get_args_parser():
                         help='epochs to warmup LR')
 
     # Dataset parameters
-    parser.add_argument('--data_path', default='/root/Dataset/CASIA2.0/', type=str,
+    parser.add_argument('--data_path', default='./Dataset/CASIA2.0/', type=str,
                         help='dataset path, should be our json_dataset or mani_dataset format. Details are in readme.md')
-    parser.add_argument('--test_data_path', default='/root/Dataset/CASIA1.0', type=str,
+    parser.add_argument('--test_data_path', default='./Dataset/CASIA1.0', type=str,
                         help='test dataset path, should be our json_dataset or mani_dataset format. Details are in readme.md')
 
     parser.add_argument('--output_dir', default='./output_dir',
@@ -174,12 +175,16 @@ def main(args):
         predict_head_norm= args.predict_head_norm,
         edge_lambda = args.edge_lambda
     )
+
+    # for param in model.encoder_net.parameters():
+    #     param.requires_grad = False
+
     if args.distributed:
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
 
     model.to(device)
 
-    model_without_ddp = model
+    model_without_ddp = model # what's ddp?
     print("Model = %s" % str(model_without_ddp))
 
     eff_batch_size = args.batch_size * args.accum_iter * misc.get_world_size()
@@ -239,7 +244,7 @@ def main(args):
             if local_f1 > best_f1 :
                 best_f1 = local_f1
                 print("Best F1 = %f" % best_f1)
-                if epoch > 35:
+                if epoch > 35: # skip first 35 models to save disk
                     misc.save_model(
                 args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
                 loss_scaler=loss_scaler, epoch=epoch)

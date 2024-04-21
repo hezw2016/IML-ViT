@@ -60,7 +60,7 @@ class base_dataset(Dataset):
         
     def __init__(self, path, output_size = 1024 ,transform = None, edge_width = None, if_return_name = False, if_return_shape = False, if_return_type = False) -> None:
         super().__init__()
-        self.tp_path, self.gt_path = self._init_dataset_path(path)
+        self.tp_path, self.gt_path = self._init_dataset_path(path) #在继承的类中定义
         if self.tp_path == None:
             raise NotImplementedError
         self.transform = transform

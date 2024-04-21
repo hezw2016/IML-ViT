@@ -6,6 +6,9 @@ from sklearn.metrics import roc_auc_score,roc_curve
 import numpy as np
 import utils.datasets
 from torch.utils.data import DataLoader
+
+from sklearn.metrics import f1_score
+
 def genertate_region_mask(masks ,batch_shape):
     """generate B 1 H W meaningful-region-mask for a batch of masks
 
@@ -46,5 +49,22 @@ def cal_F1(TP, TN, FP, FN):
     recall = TP / (TP + FN + 1e-8)
     F1 = 2 * precision * recall / (precision + recall + 1e-8)
     # F1 = torch.mean(F1) # fuse the Batch dimension
+    return F1
+
+def cal_pixel_f1_hzw(pred, target, shape, th=0.5):
+
+    # print(pred.shape, target.shape)
+    shape = shape[0]
+    pred = pred[0,0,:shape[0],:shape[1]].cpu().numpy()
+    
+    # print(pred.shape, target.shape)
+    # print(pred.shape, shape)
+    # pred = pred[0:shape[0], 0:shape[1]]
+    pred = (pred > th).astype(float)
+    # target = target
+    target = target[0,0,:shape[0],:shape[1]].cpu().numpy()
+    # target = target[0:shape[0], 0:shape[1]]
+
+    F1 = f1_score(y_true=target.flatten(), y_pred=pred.flatten(), zero_division='warn')
     return F1
     
