@@ -58,17 +58,22 @@ class base_dataset(Dataset):
         gt_path = None # Ground truth
         return tp_path, gt_path
         
-    def __init__(self, path, output_size = 1024 ,transform = None, edge_width = None, if_return_name = False, if_return_shape = False, if_return_type = False) -> None:
+    def __init__(self, path, output_size = 512, transform = None, is_train = True,
+                 edge_width = None, if_return_name = False, if_return_shape = False, if_return_type = False) -> None:
         super().__init__()
-        self.tp_path, self.gt_path = self._init_dataset_path(path) #在继承的类中定义
+        self.tp_path, self.gt_path = self._init_dataset_path(path) #在继承的子类中定义
         if self.tp_path == None:
             raise NotImplementedError
         self.transform = transform
         self.edge_generator = None if edge_width is None else EdgeGenerator(edge_width)
-        self.padding_transform =  get_albu_transforms(type_='pad', outputsize=output_size)
+        self.padding_transform =  get_albu_transforms(type_='pad', outputsize=output_size) # remove the zero-pad op
+        self.keep_transform = get_albu_transforms(type_='keep')
         self.if_return_name = if_return_name
         self.if_return_shape = if_return_shape
         self.if_return_type = if_return_type
+
+        self.is_train = is_train
+
     def __getitem__(self, index):
         output_list = []
         tp_path = self.tp_path[index]
@@ -89,6 +94,8 @@ class base_dataset(Dataset):
         
         tp_img = np.array(tp_img) # H W C
         gt_img = np.array(gt_img) # H W C
+
+        eeeeee = tp_img # H W C
         
         # Do augmentations
         if self.transform != None:
@@ -100,19 +107,30 @@ class base_dataset(Dataset):
         gt_img =  (np.mean(gt_img, axis = 2, keepdims = True)  > 127.5 ) * 1.0 # fuse the 3 channels to 1 channel, and make it binary(0 or 1)
         gt_img =  gt_img.transpose(2,0,1)[0] # H W C -> C H W -> H W
         masks_list = [gt_img]
+
+        dddddd = gt_img # H w
+
         if self.edge_generator != None: # if need to generate broaden edge mask
             broaden_gt_img = self.edge_generator(gt_img)[0][0] # B C H W -> H W
             masks_list.append(broaden_gt_img)
+        
         # Do padings
-        res_dict = self.padding_transform(image = tp_img, masks = masks_list)
+        # if self.is_train:
+        #     res_dict = self.padding_transform(image = tp_img, masks = masks_list) # do resize
+        # else:
+        #     res_dict = self.padding_transform(image = tp_img)
+        res_dict = self.padding_transform(image = tp_img, masks = masks_list) # do resize and totensor
         
         tp_img = res_dict['image']
         gt_img = res_dict['masks'][0].unsqueeze(0) # H W -> 1 H W        
         output_list.append(tp_img)
         output_list.append(gt_img)
+
+        
         
         if self.edge_generator != None:
             output_list.append(res_dict['masks'][1].unsqueeze(0)) # H W -> 1 H W
+
         if self.if_return_name:
             basenae = os.path.basename(tp_path)
             output_list.append(basenae)
@@ -125,19 +143,25 @@ class base_dataset(Dataset):
         if self.if_return_type:
             gt_type = True if torch.max(gt_img) != 0 else False
             output_list.append(gt_type)
+
+        if not self.is_train:
+            ori_dict = self.keep_transform(image = eeeeee, ori_mask = dddddd)
+            ori_mask = ori_dict['ori_mask']
+            output_list.append(ori_mask)
     
         return output_list
+    
     def __len__(self):
         return len(self.tp_path)
     
 class mani_dataset(base_dataset):
-    def _init_dataset_path(self, path):
+    def _init_dataset_path(self, path): # 先执行父类的初始化函数
         path = path
         tp_dir = os.path.join(path, 'Tp')
         gt_dir = os.path.join(path, 'Gt')
         tp_list = os.listdir(tp_dir)
         gt_list = os.listdir(gt_dir)
-        # Use sort mathod to keep order, to make sure the order is the same as the order in the tp_list and gt_list
+        # Use sort method to keep order, to make sure the order is the same as the order in the tp_list and gt_list
         tp_list.sort()
         gt_list.sort()
         t_tp_list = [os.path.join(path, 'Tp', tp_list[index]) for index in range(len(tp_list))]

@@ -165,7 +165,7 @@ class RandomInpainting(DualTransform):
         ] = self.mask_value
         return img
 
-def get_albu_transforms(type_ = 'train', outputsize = 1024):
+def get_albu_transforms(type_ = 'train', outputsize = 512):
     """get albumentations transforms
         
         type_ (str): 
@@ -175,8 +175,8 @@ def get_albu_transforms(type_ = 'train', outputsize = 1024):
             if 'pad' then return zero-padding transforms
     """
     
-    assert type_ in ['train', 'test', 'pad'] , "type_ must be 'train' or 'test' of 'pad' "
-    
+    assert type_ in ['train', 'test', 'pad', 'keep'] , "type_ must be 'train' or 'test' or 'pad' or 'keep' "
+
     trans = None
     if type_ == 'train':
         trans = albu.Compose([
@@ -231,15 +231,21 @@ def get_albu_transforms(type_ = 'train', outputsize = 1024):
         
     if type_ == 'pad':
         trans = albu.Compose([
-            albu.PadIfNeeded(          
-                min_height=outputsize,
-                min_width=outputsize, 
-                border_mode=0, 
-                value=0, 
-                position= 'top_left',
-                mask_value=0),
+            # albu.PadIfNeeded(          
+            #     min_height=outputsize,
+            #     min_width=outputsize, 
+            #     border_mode=0, 
+            #     value=0, 
+            #     position= 'top_left',
+            #     mask_value=0),
             albu.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            albu.Crop(0, 0, outputsize, outputsize),
+            albu.Resize(outputsize, outputsize),
+            # albu.Crop(0, 0, outputsize, outputsize),
+            ToTensorV2(transpose_mask=True)
+        ])
+
+    if type_ == 'keep':
+        trans = albu.Compose([
             ToTensorV2(transpose_mask=True)
         ])
     return trans

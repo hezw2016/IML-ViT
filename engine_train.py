@@ -17,8 +17,11 @@ from utils.datasets import denormalize
 import utils.evaluation as evaluation
 
 def train_one_epoch(model: torch.nn.Module,
-                    data_loader: Iterable, optimizer: torch.optim.Optimizer,
-                    device: torch.device, epoch: int, loss_scaler,
+                    data_loader: Iterable, 
+                    optimizer: torch.optim.Optimizer,
+                    device: torch.device, 
+                    epoch: int, 
+                    loss_scaler,
                     log_writer=None,
                     args=None):
     model.train(True)
@@ -101,28 +104,38 @@ def test_one_epoch(model: torch.nn.Module,
         model.eval()
         metric_logger = misc.MetricLogger(delimiter="  ")
         # F1 evaluation for an Epoch during training
-        print_freq = 20
+        print_freq = 100
         header = 'Test: [{}]'.format(epoch)
         # data_loader will return output_list
-        for data_iter_step, (images, masks, edge_mask, shape) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
+        for data_iter_step, (images, masks, edge_mask, shape, ori_mask) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
             
             images, masks, edge_mask = images.to(device), masks.to(device), edge_mask.to(device)
+            ori_mask = ori_mask.to(device)
+
             predict_loss, predict, edge_loss = model(images, masks, edge_mask)
             predict = predict.detach()
             #---- Training evaluation ----
             # region_mask is for cutting of the zero-padding area.
-            region_mask = evaluation.genertate_region_mask(masks, shape) 
-            TP, TN, FP, FN = evaluation.cal_confusion_matrix(predict, masks, region_mask)
+            # region_mask = evaluation.genertate_region_mask(masks, shape) 
+            # region_mask = torch.nn.functional.interpolate()
+            # TP, TN, FP, FN = evaluation.cal_confusion_matrix(predict, masks, region_mask)
         
-            local_f1 = evaluation.cal_F1(TP, TN, FP, FN)
+            # local_f1 = evaluation.cal_F1(TP, TN, FP, FN)
             # print(local_f1)
-            # local_f1_hzw = evaluation.cal_pixel_f1_hzw(pred=predict, target=masks, shape=shape, th=0.5)
+            size_ = shape[0]
+            predict_resize = torch.nn.functional.interpolate(predict, size = (size_[0], size_[1]), mode='bilinear', align_corners=False)
+            # masks_resize = torch.nn.functional.interpolate(masks, size = (size_[0], size_[1]), mode='nearest')
+            # print(ori_mask.shape)
+
+            # the masks and predict are both 512 x 512, we need to resize the predict back, shape is the original size
+            local_f1 = evaluation.cal_pixel_f1(pred=predict_resize, target=ori_mask.unsqueeze(0), th=0.5)
+            f1_list = [local_f1]
             # print(local_f1_hzw)
             
-            for i in local_f1: # merge batch
+            for i in f1_list: # merge batch
                 metric_logger.update(average_f1=i)
-                print(metric_logger.meters['average_f1'].count)
-                print(metric_logger.meters['average_f1'].total)
+                # print(metric_logger.meters['average_f1'].count)
+                # print(metric_logger.meters['average_f1'].total) # too many outputs in terminal
                 # print(metric_logger.meters['average_f1'].avg)
 
         metric_logger.synchronize_between_processes()    

@@ -17,7 +17,7 @@ class iml_vit_model(nn.Module):
     def __init__(
         self, 
         # ViT backbone:
-        input_size = 1024,
+        input_size = 512,
         patch_size = 16,
         embed_dim = 768,
         vit_pretrain_path = None, # wether to load pretrained weights

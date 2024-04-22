@@ -115,19 +115,23 @@ def main(args):
     torch.manual_seed(seed)
     np.random.seed(seed)
 
-    train_transform = utils.iml_transforms.get_albu_transforms('train')
-    test_transform = utils.iml_transforms.get_albu_transforms('test')
+    train_transform = utils.iml_transforms.get_albu_transforms('train', outputsize=512)
+    test_transform = utils.iml_transforms.get_albu_transforms('test', outputsize=512)
 
     # ---- dataset with crop augmentation ----
     if os.path.isdir(args.data_path):
-        dataset_train = utils.datasets.mani_dataset(args.data_path, transform=train_transform, edge_width=args.edge_broaden, if_return_shape=True)
+        dataset_train = utils.datasets.mani_dataset(args.data_path, transform=train_transform, 
+                                                    edge_width=args.edge_broaden, if_return_shape=True)
     else:
-        dataset_train = utils.datasets.json_dataset(args.data_path,transform=train_transform, edge_width = args.edge_broaden, if_return_shape = True)
+        dataset_train = utils.datasets.json_dataset(args.data_path, transform=train_transform, 
+                                                    edge_width = args.edge_broaden, if_return_shape = True)
     
     if os.path.isdir(args.test_data_path):
-        dataset_test = utils.datasets.mani_dataset(args.test_data_path, transform=test_transform, edge_width=args.edge_broaden, if_return_shape=True)
+        dataset_test = utils.datasets.mani_dataset(args.test_data_path, transform=test_transform, is_train=False,
+                                                   edge_width=args.edge_broaden, if_return_shape=True)
     else:
-        dataset_test = utils.datasets.json_dataset(args.test_data_path,transform=test_transform, edge_width = args.edge_broaden, if_return_shape = True)
+        dataset_test = utils.datasets.json_dataset(args.test_data_path, transform=test_transform, is_train=False,
+                                                   edge_width = args.edge_broaden, if_return_shape = True)
 
     print(dataset_train)
     print(dataset_test)
