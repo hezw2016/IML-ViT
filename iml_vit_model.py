@@ -12,6 +12,8 @@ sys.path.append('./modules')
 
 from utils.loss import DiceLoss, MulticlassDiceLoss
 
+import timm
+
 class iml_vit_model(nn.Module):
     
     def __init__(
@@ -81,6 +83,10 @@ class iml_vit_model(nn.Module):
             out_feature="last_feat",
             )
         self.vit_pretrain_path = vit_pretrain_path
+
+        # self.encoder = timm.create_model('swin_base_patch4_window7_224', pretrained=True)
+        # self.encoder = timm.create_model('vit_base_patch16_224', pretrained=True, img_size = 512, features_only=True)
+
         
         # simple feature pyramid network
         self.featurePyramid_net = SimpleFeaturePyramid(
@@ -135,22 +141,26 @@ class iml_vit_model(nn.Module):
         mask_pred = F.interpolate(x, size = (self.input_size, self.input_size), mode='bilinear', align_corners=False)
         
         # compute the loss
-        predict_loss = self.BCE_loss(mask_pred, masks)
-        edge_loss = 0.
-        # edge_loss = F.binary_cross_entropy_with_logits(
-        #     input = mask_pred,
-        #     target= masks, 
-        #     weight = edge_masks
-        #     ) * self.edge_lambda 
+        # predict_loss = 0.
+        cls_loss = self.BCE_loss(mask_pred, masks)
+        # edge_loss = 0.
+        edge_loss = F.binary_cross_entropy_with_logits(
+            input = mask_pred,
+            target= masks, 
+            weight = edge_masks
+            ) * self.edge_lambda 
         # predict_loss += edge_loss
         
         mask_pred = torch.sigmoid(mask_pred)
 
         dice_loss = self.DICE_loss(mask_pred, masks) # 输入之前需要经过sigmoid
-        edge_loss = dice_loss
-        predict_loss += dice_loss
+        # dice_loss = 0.
 
-        return predict_loss, mask_pred, edge_loss
+        predict_loss = cls_loss + edge_loss + dice_loss
+        # edge_loss = dice_loss
+        # predict_loss += dice_loss
+
+        return predict_loss, mask_pred, cls_loss, edge_loss, dice_loss
 
 
         

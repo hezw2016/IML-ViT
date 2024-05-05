@@ -28,7 +28,7 @@ def train_one_epoch(model: torch.nn.Module,
     metric_logger = misc.MetricLogger(delimiter="  ")
     metric_logger.add_meter('lr', misc.SmoothedValue(window_size=1, fmt='{value:.6f}'))
     header = 'Epoch: [{}]'.format(epoch)
-    print_freq = 512  #
+    print_freq = 160  #
 
     accum_iter = args.accum_iter
 
@@ -48,13 +48,16 @@ def train_one_epoch(model: torch.nn.Module,
         torch.cuda.synchronize()
         
         with torch.cuda.amp.autocast():
-            predict_loss, predict, edge_loss = model(samples, masks, edge_mask, shape)
+            predict_loss, predict, cls_loss, edge_loss, dice_loss = model(samples, masks, edge_mask, shape)
             predict_loss_value = predict_loss.item()
-            # edge_loss_value = edge_loss.item()
-            edge_loss_value = edge_loss
+            edge_loss_value = edge_loss.item()
+            # edge_loss_value = edge_loss
+            cls_loss_value = cls_loss.item()
+            dice_loss_value = dice_loss
             
-        predict_loss = predict_loss / accum_iter
-        loss_scaler(predict_loss,optimizer, parameters=model.parameters(),
+        predict_loss = predict_loss / accum_iter # why / accum_iter, because this predict_loss will be used for back_propagation
+
+        loss_scaler(predict_loss, optimizer, parameters=model.parameters(),
                     update_grad=(data_iter_step + 1) % accum_iter == 0)
                 
         if (data_iter_step + 1) % accum_iter == 0:
@@ -67,8 +70,12 @@ def train_one_epoch(model: torch.nn.Module,
         metric_logger.update(lr=lr)
         metric_logger.update(predict_loss= predict_loss_value)
         metric_logger.update(edge_loss= edge_loss_value)
+        metric_logger.update(cls_loss= cls_loss_value)
+        metric_logger.update(dice_loss= dice_loss_value)
         loss_predict_reduce = misc.all_reduce_mean(predict_loss_value)
         edge_loss_reduce = misc.all_reduce_mean(edge_loss_value)
+        cls_loss_reduce = misc.all_reduce_mean(cls_loss_value)
+        dice_loss_reduce = misc.all_reduce_mean(dice_loss_value)
 
         if log_writer is not None and (data_iter_step + 1) % 50 == 0:
             """ We use epoch_1000x as the x-axis in tensorboard.
@@ -78,6 +85,8 @@ def train_one_epoch(model: torch.nn.Module,
             # Tensorboard logging
             log_writer.add_scalar('train_loss/predict_loss', loss_predict_reduce, epoch_1000x)
             log_writer.add_scalar('train_loss/edge_loss', edge_loss_reduce, epoch_1000x)
+            log_writer.add_scalar('train_loss/cls_loss', cls_loss_reduce, epoch_1000x)
+            log_writer.add_scalar('train_loss/dice_loss', dice_loss_reduce, epoch_1000x)
             log_writer.add_scalar('lr', lr, epoch_1000x)
                
     if log_writer is not None:
@@ -90,6 +99,8 @@ def train_one_epoch(model: torch.nn.Module,
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
     print("Averaged stats:", metric_logger)
+    print("\n=====================================================================================")
+    print("\n=====================================================================================")
     return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
 
 
@@ -104,7 +115,7 @@ def test_one_epoch(model: torch.nn.Module,
         model.eval()
         metric_logger = misc.MetricLogger(delimiter="  ")
         # F1 evaluation for an Epoch during training
-        print_freq = 100
+        print_freq = 200
         header = 'Test: [{}]'.format(epoch)
         # data_loader will return output_list
         for data_iter_step, (images, masks, edge_mask, shape, ori_mask) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
@@ -112,7 +123,7 @@ def test_one_epoch(model: torch.nn.Module,
             images, masks, edge_mask = images.to(device), masks.to(device), edge_mask.to(device)
             ori_mask = ori_mask.to(device)
 
-            predict_loss, predict, edge_loss = model(images, masks, edge_mask)
+            predict_loss, predict, cls_loss, edge_loss, dice_loss  = model(images, masks, edge_mask)
             predict = predict.detach()
             #---- Training evaluation ----
             # region_mask is for cutting of the zero-padding area.
@@ -151,4 +162,6 @@ def test_one_epoch(model: torch.nn.Module,
             log_writer.add_images('test/edge_mask', edge_mask, epoch)
             
         print("Averaged stats:", metric_logger)
+        print("\n=====================================================================================")
+        print("\n=====================================================================================")
         return {k: meter.global_avg for k, meter in metric_logger.meters.items()}

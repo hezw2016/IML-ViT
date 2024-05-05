@@ -87,6 +87,7 @@ class SmoothedValue(object):
 
 class MetricLogger(object):
     def __init__(self, delimiter="\t"):
+        # self.meters = defaultdict(SmoothedValue(fmt='{global_avg:.4f}'))
         self.meters = defaultdict(SmoothedValue)
         self.delimiter = delimiter
 

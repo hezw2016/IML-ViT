@@ -185,7 +185,6 @@ def get_albu_transforms(type_ = 'train', outputsize = 512):
             RandomCopyMove(p = 0.1),
             RandomInpainting(p = 0.1),
             # Flips
-            # albu.Resize(512, 512),
             albu.HorizontalFlip(p=0.5),
             albu.VerticalFlip(p=0.5),
             # Brightness and contrast fluctuation

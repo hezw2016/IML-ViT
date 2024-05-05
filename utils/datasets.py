@@ -108,7 +108,7 @@ class base_dataset(Dataset):
         gt_img =  gt_img.transpose(2,0,1)[0] # H W C -> C H W -> H W
         masks_list = [gt_img]
 
-        dddddd = gt_img # H w
+        dddddd = gt_img # H W
 
         if self.edge_generator != None: # if need to generate broaden edge mask
             broaden_gt_img = self.edge_generator(gt_img)[0][0] # B C H W -> H W
@@ -146,7 +146,7 @@ class base_dataset(Dataset):
 
         if not self.is_train:
             ori_dict = self.keep_transform(image = eeeeee, ori_mask = dddddd)
-            ori_mask = ori_dict['ori_mask']
+            ori_mask = ori_dict['ori_mask'] #为了计算F1，需要将原本的gt_mask输出，训练的时候没有使用crop
             output_list.append(ori_mask)
     
         return output_list

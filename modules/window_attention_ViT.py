@@ -8,6 +8,8 @@ import torch.distributed as dist
 from torch.nn import functional as F
 import math
 
+import timm
+
 """
 Thanks for the open-source of detectron2, part of codes are from their implementation:
 https://github.com/facebookresearch/detectron2
@@ -1088,6 +1090,12 @@ class SimpleFeaturePyramid(nn.Module):
             results.extend(self.top_block(top_block_in_feature))
         assert len(self._out_features) == len(results)
         return {f: res for f, res in zip(self._out_features, results)}
+
+
+# class Swin(nn.Module):
+#     def __init__(self):
+#         super().__init__()
+
 
 """
 Code below is for testing

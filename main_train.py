@@ -222,9 +222,15 @@ def main(args):
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
             data_loader_train.sampler.set_epoch(epoch)
+        
+        #####################  TRAIN train  ###########################
         train_stats = train_one_epoch(
-            model, data_loader_train,
-            optimizer, device, epoch, loss_scaler,
+            model, 
+            data_loader_train,
+            optimizer, 
+            device, 
+            epoch, 
+            loss_scaler,
             log_writer=log_writer,
             args=args
         )
@@ -236,6 +242,7 @@ def main(args):
             
         optimizer.zero_grad()
         if epoch  % args.test_period == 0 or epoch + 1 == args.epochs:
+            #####################  TEST test  ###########################
             test_stats = test_one_epoch(
                 model, 
                 data_loader = data_loader_test, 
@@ -248,7 +255,7 @@ def main(args):
             if local_f1 > best_f1 :
                 best_f1 = local_f1
                 print("Best F1 = %f" % best_f1)
-                if epoch > 35: # skip first 35 models to save disk
+                if epoch > 50: # skip first 35 models to save disk
                     misc.save_model(
                 args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
                 loss_scaler=loss_scaler, epoch=epoch)
