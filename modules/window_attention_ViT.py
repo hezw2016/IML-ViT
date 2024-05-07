@@ -1014,7 +1014,7 @@ class SimpleFeaturePyramid(nn.Module):
         self.scale_factors = scale_factors
         
         self.stages = []
-        strides = [input_stride // s for s in scale_factors]
+        strides = [input_stride // s for s in scale_factors] # [4 8 16 32]
         _assert_strides_are_log2_contiguous(strides)
         use_bias = norm == ""
         for idx, scale in enumerate(scale_factors):
@@ -1057,8 +1057,8 @@ class SimpleFeaturePyramid(nn.Module):
                 ]
             )
             layers = nn.Sequential(*layers)
-            stage = int(math.log2(strides[idx]))
-            self.add_module(f"simfp_{stage}", layers)
+            stage = int(math.log2(strides[idx])) # scale 4 对应了 stage 2
+            self.add_module(f"simfp_{stage}", layers) # ?
             self.stages.append(layers)
 
             self.top_block = top_block
@@ -1143,10 +1143,10 @@ if __name__ == '__main__':
     model.cpu()
     print("constructed model")
     print(model)
-    x = torch.randn(1, 3, 1024, 1024)
+    x = torch.randn(1, 3, 512, 512)
     x = net(x)
-    # last_feature = x["last_feat"]
-    print(x)
+    last_feature = x["last_feat"]
+    print(last_feature.shape)
     # y = model(last_feature)
     y = model(x)
     for k in y.keys():

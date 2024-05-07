@@ -203,7 +203,7 @@ def main(args):
     print("effective batch size: %d" % eff_batch_size)
 
     if args.distributed:
-        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu], find_unused_parameters=False)
+        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu], find_unused_parameters=True)
         model_without_ddp = model.module
     
     # following timm: set wd as 0 for bias and norm layers
@@ -219,6 +219,7 @@ def main(args):
     print(f"Start training for {args.epochs} epochs")
     start_time = time.time()
     best_f1 = 0
+    best_epoch = 0
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
             data_loader_train.sampler.set_epoch(epoch)
@@ -252,13 +253,17 @@ def main(args):
                 args = args
             )
             local_f1 = test_stats['average_f1']
-            if local_f1 > best_f1 :
+            if local_f1 > best_f1:
                 best_f1 = local_f1
-                print("Best F1 = %f" % best_f1)
+                best_epoch = epoch
+                print("Best F1 = %f at this epoch" % best_f1)
                 if epoch > 50: # skip first 35 models to save disk
+                    print('Saving models ...................................')
                     misc.save_model(
                 args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
                 loss_scaler=loss_scaler, epoch=epoch)
+            else:
+                print("[This epoch is not the best] ========> Best F1 = %f at %d-th epoch" % (best_f1, best_epoch))
                 
             log_stats =  {**{f'train_{k}': v for k, v in train_stats.items()},
                         **{f'test_{k}': v for k, v in test_stats.items()},

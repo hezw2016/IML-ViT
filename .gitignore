@@ -16,3 +16,4 @@ experiments
 *.txt
 output_dir
 experiments-test
+pytorch-image-models

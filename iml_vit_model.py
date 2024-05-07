@@ -21,12 +21,11 @@ class iml_vit_model(nn.Module):
         # ViT backbone:
         input_size = 512,
         patch_size = 16,
-        embed_dim = 768,
+        embed_dim = 512,
         vit_pretrain_path = None, # wether to load pretrained weights
         # Simple_feature_pyramid_network:
         fpn_channels = 256,
         fpn_scale_factors = (4.0, 2.0, 1.0, 0.5),
-
         # MLP embedding:
         mlp_embeding_dim = 256,
         # Decoder head norm
@@ -56,46 +55,55 @@ class iml_vit_model(nn.Module):
         self.input_size = input_size
         self.patch_size = patch_size
         # window attention vit
-        self.encoder_net = window_attention_vit(  
-            img_size = input_size,
-            patch_size=16,
-            embed_dim=embed_dim,
-            depth=12,
-            num_heads=12,
-            drop_path_rate=0.1,
-            window_size=14,
-            mlp_ratio=4,
-            qkv_bias=True,
-            norm_layer=partial(nn.LayerNorm, eps=1e-6),
-            window_block_indexes=[
-                # 2, 5, 8 11 for global attention
-                0,
-                1,
-                3,
-                4,
-                6,
-                7,
-                9,
-                10,
-            ],
-            residual_block_indexes=[],
-            use_rel_pos=True,
-            out_feature="last_feat",
-            )
-        self.vit_pretrain_path = vit_pretrain_path
+        # self.encoder_net = window_attention_vit(  
+        #     img_size = input_size,
+        #     patch_size=16,
+        #     embed_dim=embed_dim,
+        #     depth=12,
+        #     num_heads=12,
+        #     drop_path_rate=0.1,
+        #     window_size=14,
+        #     mlp_ratio=4,
+        #     qkv_bias=True,
+        #     norm_layer=partial(nn.LayerNorm, eps=1e-6),
+        #     window_block_indexes=[
+        #         # 2, 5, 8 11 for global attention
+        #         0,
+        #         1,
+        #         3,
+        #         4,
+        #         6,
+        #         7,
+        #         9,
+        #         10,
+        #     ],
+        #     residual_block_indexes=[],
+        #     use_rel_pos=True,
+        #     out_feature="last_feat",
+        #     )
+        # self.vit_pretrain_path = vit_pretrain_path
 
-        # self.encoder = timm.create_model('swin_base_patch4_window7_224', pretrained=True)
-        # self.encoder = timm.create_model('vit_base_patch16_224', pretrained=True, img_size = 512, features_only=True)
+        # self.encoder_net = timm.create_model('vit_base_patch16_224', pretrained=True, img_size = input_size)
+        # print('load pretrained weights from timm lib')
+
+        self.encoder_net = timm.create_model('swin_base_patch4_window7_224', pretrained=True, img_size = input_size)
+        print('load pretrained weights from timm lib')
 
         
         # simple feature pyramid network
         self.featurePyramid_net = SimpleFeaturePyramid(
-            in_feature_shape= (1, embed_dim, 256, 256),
+            in_feature_shape= (1, embed_dim, 256, 256), # 这里的1 256 256都没有被实际用到，最关键的参数为embed_dim
             out_channels= fpn_channels,
             scale_factors=fpn_scale_factors,
             top_block=LastLevelMaxPool(),
             norm="LN",    
         )
+        # self.featurePyramid_net = SimpleFeaturePyramid(
+        #     in_feature_shape= (1, embed_dim, 256, 256), # 这里的1 256 256都没有被实际用到，最关键的参数为embed_dim
+        #     out_channels= fpn_channels,
+        #     scale_factors=fpn_scale_factors,
+        #     norm="LN",    
+        # )
         # MLP predict head
         self.predict_head = PredictHead(
             feature_channels=[fpn_channels for i in range(5)], 
@@ -107,8 +115,8 @@ class iml_vit_model(nn.Module):
         self.edge_lambda = edge_lambda
         self.DICE_loss = DiceLoss()
         
-        self.apply(self._init_weights)
-        self._mae_init_weights()
+        # self.apply(self._init_weights)
+        # self._mae_init_weights()
         
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
@@ -130,8 +138,13 @@ class iml_vit_model(nn.Module):
             print('load pretrained weights from \'{}\'.'.format(self.vit_pretrain_path))
     
     def forward(self, x:torch.Tensor, masks, edge_masks, shape= None):
-        x = self.encoder_net(x)
-        x = self.featurePyramid_net(x)
+        # x = self.encoder_net(x)
+        # x = self.encoder_net.get_intermediate_layers(x, n = 1, reshape = True)[0] # B 768 32 32
+        x = self.encoder_net.forward_intermediates(x, indices = 2, 
+                                                   intermediates_only = True, stop_early = True)[0]
+        x_dict = {'last_feat': x}
+
+        x = self.featurePyramid_net(x_dict)
         feature_list = []
         for k, v in x.items():
             feature_list.append(v)
@@ -161,6 +174,31 @@ class iml_vit_model(nn.Module):
         # predict_loss += dice_loss
 
         return predict_loss, mask_pred, cls_loss, edge_loss, dice_loss
+    
+# test code
+if __name__ == '__main__':
+    input = torch.rand(2, 3, 512, 512)
+
+    # pip install timm from source, version = 1.0.0dev0
+
+    model = timm.create_model('vit_base_patch16_224', pretrained=True, img_size = 512)
+    # print(model)
+    output = model.forward_intermediates(input, indices = 1, norm = False, 
+                                         intermediates_only = True, stop_early = True)[0]
+    print(output.shape)
+    
+    
+    model = timm.create_model('swin_base_patch4_window7_224', pretrained=True, img_size = 512)
+    output = model.forward_intermediates(input, indices = 2, 
+                                         intermediates_only = True, stop_early = True)[0]
+    print(output.shape)
+
+    # print(timm.list_models(pretrained=True))
+
+    # print('type:', type(model))
+    # print('len:', len(model))
+    # for item in model:
+    #     print(item)
 
 
         
